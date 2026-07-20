@@ -673,3 +673,25 @@ section{ padding: clamp(2.6rem, 6vw, 4.2rem) 0; }
 @media (prefers-reduced-motion: reduce){
   *{ transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Image placeholders (temporary, until real photos are added) ---------- */
+.img-placeholder{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bg-b), var(--bg-b) 12px,
+    var(--bg-a) 12px, var(--bg-a) 24px
+  );
+  border: 2px dashed var(--olive-dark);
+  color: var(--brown);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 1rem;
+  line-height: 1.4;
+}
+.img-placeholder span{ max-width: 22ch; }
