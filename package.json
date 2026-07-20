@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "agentation": "^3.0.2",
+    "retune": "^0.7.6"
+  }
+}

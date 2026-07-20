@@ -1,6 +1,15 @@
 // Centro Comunitário Sonho Real — shared site behaviour
 
 document.addEventListener('DOMContentLoaded', function () {
+  // Dismissible top notice bar
+  var noticeBar = document.getElementById('notice-bar');
+  var noticeClose = document.querySelector('.notice-close');
+  if (noticeBar && noticeClose) {
+    noticeClose.addEventListener('click', function () {
+      noticeBar.classList.add('is-hidden');
+    });
+  }
+
   // Mobile nav toggle
   var toggle = document.querySelector('.nav-toggle');
   var nav = document.querySelector('.main-nav');

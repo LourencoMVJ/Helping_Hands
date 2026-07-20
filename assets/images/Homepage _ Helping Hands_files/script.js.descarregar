@@ -1,0 +1,117 @@
+function setupIcons() {
+  const hamburgerIcon = document.querySelector('.hamburger-icon');
+  const closeIcon = document.querySelector('.close-icon');
+  const mobileMenu = document.querySelectorAll('.site-links');
+  const header = document.querySelector('.header');
+  let isHamburgerIconVisible = true;
+
+  function toggleIcons() {
+    isHamburgerIconVisible = !isHamburgerIconVisible;
+    hamburgerIcon.style.display = isHamburgerIconVisible ? 'flex' : 'none';
+    closeIcon.style.display = isHamburgerIconVisible ? 'none' : 'flex';
+    mobileMenu.forEach((mobileMenu) => {
+      // mobileMenu.style.display = isHamburgerIconVisible ? 'none' : 'flex';
+      if(isHamburgerIconVisible){
+        mobileMenu.classList.add('responsive-hide');
+      }else{
+        mobileMenu.classList.remove('responsive-hide');
+      }
+    })
+    isHamburgerIconVisible ?
+      header.classList.remove('open-onclick') :
+      header.classList.add('open-onclick');
+  }
+
+  hamburgerIcon.addEventListener('click', toggleIcons);
+  closeIcon.addEventListener('click', toggleIcons);
+
+  // window.onresize = function () {
+  //   const width = window.innerWidth;
+  //   mobileMenu.forEach((mobileMenu) => {
+  //     mobileMenu.style.display = width <= 1024 ? 'none' : 'flex';
+  //   })
+  // }
+}
+
+setupIcons();
+
+// function handleDOMUpdate() {
+//   setupIcons();
+// }
+
+// const observer = new MutationObserver(handleDOMUpdate);
+// observer.observe(document.body, { childList: true, subtree: true });
+
+function adjustScrollPosition() {
+  if (window.location.hash) {
+    const hash = window.location.hash;
+    const targetElement = document.querySelector(hash);
+    if (targetElement) {
+      // Calculate the position to scroll to (50px above the target element)
+      const offsetPosition = targetElement.offsetTop - 50;
+      // Scroll to the calculated position
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  }
+}
+
+// Adjust scroll position when the page loads with a hash in the URL
+adjustScrollPosition();
+
+// Adjust scroll position when the hash changes
+window.addEventListener("hashchange", function () {
+  setTimeout(adjustScrollPosition, 0);
+});
+
+// Handle click events on hash links to adjust scroll position
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function (event) {
+    event.preventDefault();
+    const targetId = this.getAttribute('href');
+    const targetElement = document.querySelector(targetId);
+    if (targetElement) {
+      const offsetPosition = targetElement.offsetTop - 50;
+      window.history.pushState(null, null, targetId);
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  });
+});
+
+/**
+ * activeCurrentMenu
+ *
+ * This function highlights the current menu item based on the current URL path by adding
+ * an 'active' class to the corresponding anchor tag in the menu. It ensures that the
+ * homepage ("/") and blank URLs are not marked as active. Additionally, it avoids running
+ * if the script is executed within an iframe or similar context.
+ *
+ * The function should be executed when the DOM is fully loaded.
+ *
+ * Usage:
+ * 1. Ensure your menu items have href attributes that correspond to the URL paths.
+ * 2. Include the function in your script.
+ * 3. Add an event listener to run the function when the DOM content is loaded.
+ *
+ * Example:
+ * document.addEventListener('DOMContentLoaded', activeCurrentMenu);
+ */
+// function activeCurrentMenu() {
+//   // don't hide if it's from editor
+//   if (window.self !== window.top) return;
+//   const currentPath = window.location.pathname;
+//   const menuItems = document.querySelectorAll('#menu-list a');
+//   menuItems.forEach(item => {
+//     const itemPath = item.getAttribute('href');
+//     if (itemPath !== '/' && itemPath && currentPath === itemPath) {
+//       item.classList.add('active');
+//     }
+//   });
+// }
+
+// document.addEventListener('DOMContentLoaded', activeCurrentMenu);

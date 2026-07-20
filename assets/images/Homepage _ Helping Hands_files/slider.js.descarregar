@@ -1,0 +1,661 @@
+/**
+ *
+ * @param {*} sliderID (sectionId)
+ * @param {*} numbersOfSlideOnViewport
+ * @param {*} autoSlide
+ * @param {*} activeSlideUUID
+ *
+ */
+
+function isInEditorIframe() {
+  const EDITOR_DOMAINS = ['editor.rocketpages.io', 'editorstage.rocketpages.io', 'editordev.rocketpages.io', 'localhost:4321']
+  if (EDITOR_DOMAINS.includes(window.location.host)) return true
+  return false
+}
+
+function Slider({ sliderID, numbersOfSlideOnViewport = 1, autoSlide = false, activeSlideUUID = null, showArrows = true, stopAutoSlide = false }) {
+
+  const carouselContainer = document.querySelector('[data-uuid="' + sliderID + '"]');
+  if (!carouselContainer) return;
+  const slider = carouselContainer.querySelector('.slider');
+  if (!slider) {
+    return;
+  }
+  // console.log('============Slider', stopAutoSlide);
+  // const slideCards = carouselContainer.querySelectorAll('.slide');
+  const arrowLeft = carouselContainer.querySelector('.prev');
+  const arrowRight = carouselContainer.querySelector('.next');
+  const progressBar = carouselContainer.querySelector(' .progress-bar');
+  const dotContainer = carouselContainer.querySelector(' .dots-container');
+  const previewContainer = carouselContainer.querySelector(' .preview-container');
+  let isMoving = false;
+  let animationCssTimer = '0.5s';
+  let scrollingToSlide = null;
+  let animationsCount = 0;
+  let intervalId;
+  // ======================= get slides functions ==========================
+  function getUniqueStackCards() {
+    // console.log('getUniqueStackCards');
+    let stackCard = carouselContainer.querySelectorAll('.slide');
+    const uniqueSlideCards = [];
+    stackCard.forEach(card => !uniqueSlideCards.find(uCard => uCard.getAttribute('data-uuid') === card.getAttribute('data-uuid')) && uniqueSlideCards.push(card));
+    return uniqueSlideCards;
+  }
+  function getSortedUniqueStackCards() {
+    // console.log('getSortedUniqueStackCards');
+    return getUniqueStackCards().sort((a, b) => a.getAttribute('data-idx') - b.getAttribute('data-idx'));
+  }
+
+  function getAllStackCards() {
+    // console.log('getAllStackCards');
+    return Array.from(carouselContainer.querySelectorAll('.slide'));
+  }
+
+  // ======================= get slides functions end ==========================
+
+  // ======================= Botton/Arrows click events start =================================================
+
+  function addCloneToLeft(callback) {
+    // console.log('addCloneToLeft');
+    const stackCards = getAllStackCards();
+    const sliderContainer = stackCards[0].parentNode;
+    const targetEl = stackCards[stackCards.length - 1];
+
+    const lastSlide = targetEl.cloneNode(true);
+    sliderContainer.insertBefore(lastSlide, sliderContainer.firstChild);
+    getAllStackCards().forEach(function (card) {
+      card.style.animation = `slideInFromLeft ${animationCssTimer} linear`;
+    });
+
+    sliderContainer.onanimationend = (e) => {
+      targetEl.remove();
+      removeAnimationFromAllSlides();
+      callback();
+    };
+  }
+
+  function addCloneToRight(callback) {
+    // console.log('addCloneToRight');
+    const stackCards = getAllStackCards();
+    const sliderContainer = stackCards[0].parentNode;
+    const targetEl = stackCards[0];
+
+    const firstSlide = targetEl.cloneNode(true);
+
+    sliderContainer.append(firstSlide);
+    animationsCount++;
+    getAllStackCards().forEach(function (card) {
+      card.style.animation = `slideInFromRight ${animationCssTimer} linear`;
+    });
+    sliderContainer.onanimationend = (e) => {
+      targetEl.remove();
+      removeAnimationFromAllSlides();
+      animationsCount--;
+      callback();
+    };
+  }
+
+  async function scrollLeft(e, updateSlideChange = true) {
+    // console.log('scrollLeft');
+    if (e) {
+      e.stopPropagation();
+    }
+    if (isMoving) return;
+    isMoving = true;
+
+    await new Promise((res) => {
+      addCloneToLeft(res);
+    });
+
+    if (updateSlideChange) {
+      // console.log('scrollLeft: slide changed. now handleSlideChange');
+      handleSlideChange();
+    }
+    isMoving = false;
+  }
+
+  async function scrollRight(e, updateSlideChange = true) {
+    // console.log('scrollRight');
+    if (e) {
+      e.stopPropagation();
+    }
+    if (isMoving) return;
+    isMoving = true;
+
+    await new Promise((res) => {
+      addCloneToRight(res);
+    });
+
+    if (updateSlideChange) {
+      // console.log('scrollRight: slide changed. now handleSlideChange');
+      handleSlideChange();
+    }
+    isMoving = false;
+  }
+
+  if (arrowRight) {
+    arrowRight.onclick = scrollRight;
+  }
+  if (arrowLeft) {
+    arrowLeft.onclick = scrollLeft;
+  }
+
+  // ======================= Botton/Arrows click events end =================================================
+
+
+  // Function to smoothly scroll to a slide
+  async function scrollToSlide(uuid, isFromReinit = false) {
+    if (scrollingToSlide === uuid) return;
+
+    // if (isFromReinit) {
+    //   removeDuplicateCards();
+    // }
+
+    const stackCards = getUniqueStackCards();
+    if (!stackCards.length) return;
+
+    const currentSlideUUID = getAllStackCards()[0].getAttribute('data-uuid');
+    // console.log('scrollToSlide: currentSlideUUID', {currentSlideUUID, uuid});
+    if (currentSlideUUID === uuid) {
+      handleSlideChange();
+      return;
+    };
+
+    scrollingToSlide = uuid;
+
+    let newIdx = stackCards.findIndex(slide => slide.getAttribute('data-uuid') === uuid);
+    if (newIdx === -1) {
+      newIdx = 0;
+    }
+
+    // const totalTime = (500/(stackCards.length - 1))/1000;
+    // animationCssTimer = totalTime + 's';
+    // animationCssTimer = '0.5s';
+    // console.log('scrollToSlide', newIdx, stackCards.length);
+    while (newIdx !== 0) {
+      if (newIdx > 0) {
+        newIdx--;
+        await scrollRight(null, false);
+      } else {
+        newIdx++;
+        await scrollLeft(null, false);
+      }
+
+      // console.log('scrollToSlide while', newIdx, stackCards.length);
+      isMoving = false;
+    }
+
+    animationCssTimer = '0.5s';
+    isMoving = false;
+    scrollingToSlide = null;
+
+    if (isFromReinit) {
+      removeDuplicateCards();
+    }
+
+    // console.log('scrollToSlide: while finished. now handleSlideChange');
+    handleSlideChange();
+
+  }
+
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].scrollToSlide = scrollToSlide;
+
+  // ========================= add dots, preview, progress bar ========================
+
+  function addDots() {
+    // console.log('addDots');
+    // If dot-container is available then add dots to the container
+    if (dotContainer) {
+
+      // Remove all dots elements by setting innerHTML to an empty string
+      dotContainer.innerHTML = '';
+
+      // Add dots to the container
+      const slideCards = getSortedUniqueStackCards();
+      slideCards.forEach((slide, index) => {
+        const dot = document.createElement('span');
+        dot.classList.add('dot');
+        dot.setAttribute('data-slide', index);
+        const uuid = slide.getAttribute('data-uuid');
+        dot.setAttribute('data-slide-uuid', uuid);
+        index === 0 && dot.classList.add('active');
+        dot.onclick = function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          currentSlide = index;
+          scrollToSlide(uuid);
+          activeDot();
+          udpateProgressBar();
+        }
+        dotContainer.appendChild(dot);
+      })
+        ;
+    }
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].addDots = addDots;
+
+  // Udpate the active slide dots
+  const activeDot = function (currentUUID) {
+    if (dotContainer) {
+      addDots();
+
+      const allStackCards = getAllStackCards();
+      // let currentUUID;
+      if (!currentUUID && allStackCards[0]) {
+        currentUUID = allStackCards[0].getAttribute('data-uuid');
+      }
+      // console.log('activeDot activating', currentUUID);
+      document.querySelectorAll(`[data-uuid="${sliderID}"] .dots-container .dot`).forEach(dot => dot.classList.remove('active'));
+      document.querySelector(`[data-uuid="${sliderID}"] .dots-container .dot[data-slide-uuid="${currentUUID}"]`)?.classList.add('active');
+    }
+  };
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].activeDot = activeDot;
+
+  function addPreviewContainer() {
+    //If preview-container is available then add preview-images to the container
+    if (previewContainer) {
+
+      // Remove all dots elements by setting innerHTML to an empty string
+      previewContainer.innerHTML = '';
+
+      // Add dots to the container
+      const slideCards = getSortedUniqueStackCards();
+      slideCards.forEach((slide, index) => {
+
+        let slideImage = slide.querySelector(' img');
+
+        let previewImage = document.createElement('div');
+        const uuid = slide.getAttribute('data-uuid');
+        previewImage.classList.add('preview-image');
+        previewImage.setAttribute('preview-image-slide', index);
+        previewImage.setAttribute('preview-image-slide-uuid', uuid);
+        index === 0 && previewImage.classList.add('active');
+
+        let image = document.createElement('img');
+        image.src = slideImage.src;
+        image.alt = slideImage.alt;
+
+        previewImage.appendChild(image)
+
+        previewImage.onclick = function () {
+          currentSlide = index;
+          scrollToSlide(uuid);
+          activePreviewImage(uuid);
+        };
+        previewContainer.appendChild(previewImage);
+      })
+        ;
+    }
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].addPreviewContainer = addPreviewContainer;
+
+  // Udpate the active preview image
+  const activePreviewImage = function (uuid) {
+    if (previewContainer) {
+      const sortedStackCards = getSortedUniqueStackCards();
+      let sliderChanged = false;
+      const previewEls = document.querySelectorAll(`[data-uuid="${sliderID}"] .preview-container .preview-image`);
+      if (previewEls.length !== sortedStackCards.length) {
+        sliderChanged = true;
+      }
+      !sliderChanged && previewEls.forEach((preview, idx) => {
+        if (preview.getAttribute('preview-image-slide-uuid') !== sortedStackCards[idx].getAttribute('data-uuid')) {
+          sliderChanged = true;
+        }
+      });
+      sliderChanged && addPreviewContainer();
+      const allStackCards = getAllStackCards();
+      let currentUUID;
+      if (allStackCards[0]) {
+        currentUUID = allStackCards[0].getAttribute('data-uuid');
+      }
+
+      previewEls.forEach(dot => dot.classList.remove('active'));
+      const activeSlide = document.querySelector(`[data-uuid="${sliderID}"] .preview-container .preview-image[preview-image-slide-uuid="${currentUUID}"]`);
+      if (!activeSlide) return;
+
+      activeSlide.classList.add('active');
+
+      previewContainer.scroll({
+        left: activeSlide.offsetLeft - activeSlide.getBoundingClientRect().width,
+        behavior: 'smooth'
+      })
+    }
+  };
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].activePreviewImage = activePreviewImage;
+
+  // Update progress bar
+  const udpateProgressBar = function () {
+    if (progressBar) {
+      let currentSlide = getCurrentSlideIdx();
+
+      const slideCards = getUniqueStackCards();
+      const progress = ((+currentSlide + 1) / slideCards.length) * 100;
+      // console.log('udpateProgressBar', progress);
+      progressBar.style.width = `${progress}%`;
+    }
+  }
+
+  // ========================= add dots, preview, progress bar end ========================
+
+  // ======================= Logic for Auto Slide start =================================================
+  if (autoSlide) {
+    // To store the interval ID
+
+    // Call the inner function continuously every 3 seconds
+    function startInterval() {
+      if (isInEditorIframe()) return;
+
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+
+      intervalId = setInterval(function () {
+        if (stopAutoSlide == false && !getAllStackCards()?.map(card => card.getAttribute('data-uuid')).join(',').includes(window.pageBuilder?.activeAccordianId)) {
+          scrollRight();
+        }
+      }, 3000);
+    }
+
+    function stopInterval() {
+      intervalId && clearInterval(intervalId);
+    }
+
+    window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].stopInterval = stopInterval;
+
+    window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].startInterval = startInterval;
+
+    // Attach event listeners to stop and start the interval when hovering over the slider
+
+    slider.onmouseenter = stopInterval;
+    slider.onmouseleave = startInterval;
+
+    // Initial start of the interval
+    startInterval();
+  }
+  // ======================= Logic for Auto Slide end =================================================
+
+
+  // ======================= Logic to Change Slide on Swipe start =================================================
+
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  slider.ontouchstart = function (e) {
+    touchStartX = e.touches[0].clientX;
+  }
+
+  slider.ontouchmove = function (e) {
+    touchEndX = e.touches[0].clientX;
+  };
+
+  slider.ontouchend = function () {
+    if (touchEndX !== 0) {
+      const touchThreshold = window.innerWidth * 0.25; // Adjust this value to control swipe sensitivity
+      const deltaX = touchEndX - touchStartX;
+
+      if (deltaX > touchThreshold) {
+        // Swipe right, move to the previous slide
+        scrollLeft();
+      } else if (deltaX < -touchThreshold) {
+        // Swipe left, move to the next slide
+        scrollRight();
+      }
+    }
+  };
+
+  // ======================= Logic to Change Slide on Swipe end =================================================
+
+
+  // =============== helper functions =======================
+
+  function removeAnimationFromAllSlides() {
+    getAllStackCards().forEach(slide => slide?.style && (slide.style.animation = ''));
+  }
+
+  function getCurrentSlideIdx() {
+    const allStackCards = getAllStackCards();
+    let currentSlide;
+    if (allStackCards[0]) {
+      currentSlide = allStackCards[0].getAttribute('data-idx');
+    } else if (allStackCards[0]) {
+      currentSlide = allStackCards[0].getAttribute('data-idx');
+    }
+
+    return currentSlide;
+  }
+
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].getCurrentSlideIdx = getCurrentSlideIdx;
+
+  function getCurrentSlideUUID() {
+    const allStackCards = getAllStackCards();
+    let currentSlide;
+    if (allStackCards[0]) {
+      currentSlide = allStackCards[0].getAttribute('data-uuid');
+    } else if (allStackCards[0]) {
+      currentSlide = allStackCards[0].getAttribute('data-uuid');
+    }
+
+    return currentSlide;
+  }
+
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].getCurrentSlideUUID = getCurrentSlideUUID;
+
+  function handleSlideChange(id) {
+    // console.log('handleSlideChange', id);
+    activeDot();
+    udpateProgressBar();
+    activePreviewImage();
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].handleSlideChange = handleSlideChange;
+
+  async function handleAddNewSlide(id) {
+    // console.log('handleAddNewSlide called: ', id);
+    // slider.scrollLeft = 0;  // Need this to reset the scroll position on add new slide
+    // await scrollToSlide(id);
+    toggleArrows();
+
+    // console.log('handleAddNewSlide: slide changed. now handleSlideChange');
+    // handleSlideChange();
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].handleAddNewSlide = handleAddNewSlide;
+
+  function handleDeleteSlide() {
+    // console.log('handleDeleteSlide');
+    // window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].reInit({});
+    activeDot();
+    activePreviewImage();
+    udpateProgressBar();
+
+    toggleArrows();
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].handleDeleteSlide = handleDeleteSlide;
+
+  function toggleArrows() {
+    if (!showArrows) {
+      arrowLeft && (arrowLeft.style.display = 'none');
+      arrowRight && (arrowRight.style.display = 'none');
+      progressBar && (progressBar.parentElement.style.display = 'none');
+      carouselContainer.querySelector('.btn-slide') && (carouselContainer.querySelector('.btn-slide').style.display = 'none');
+      return;
+    }
+    const slides = getUniqueStackCards();
+    // console.log(slides.length, numbersOfSlideOnViewport);
+    if (slides.length <= numbersOfSlideOnViewport) {
+      arrowLeft && (arrowLeft.style.display = 'none');
+      arrowRight && (arrowRight.style.display = 'none');
+      progressBar && (progressBar.parentElement.style.display = 'none');
+      if (carouselContainer.querySelector('.slide-btn-container')) {
+        carouselContainer.querySelector('.slide-btn-container').style.display = 'none';
+        if (carouselContainer.querySelector('.dots-container')) {
+          carouselContainer.querySelector('.dots-container').style.display = 'none';
+        }
+      }
+      else if (carouselContainer.querySelector('.btn-slide')) {
+        carouselContainer.querySelectorAll('.btn-slide').forEach((el) => {
+          el.style.display = 'none';
+        })
+      }
+
+    } else {
+      arrowLeft && (arrowLeft.style.display = 'flex');
+      arrowRight && (arrowRight.style.display = 'flex');
+      progressBar && (progressBar.parentElement.style.display = 'block');
+      if (carouselContainer.querySelector('.slide-btn-container')) {
+        carouselContainer.querySelector('.slide-btn-container').style.display = 'flex';
+        if (carouselContainer.querySelector('.dots-container')) {
+          carouselContainer.querySelector('.dots-container').style.display = 'flex';
+        }
+      }
+      else if (carouselContainer.querySelector('.btn-slide')) {
+        carouselContainer.querySelectorAll('.btn-slide').forEach((el) => {
+          el.style.display = 'flex';
+        })
+      }
+    }
+  }
+
+  function resetSlider() {
+    // console.log('resetSlider');
+    stopInterval && stopInterval();
+    slider.onmouseenter = null;
+    slider.onmouseleave = null;
+
+    removeDuplicateCards();
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].resetSlider = resetSlider;
+
+  function removeDuplicateCards() {
+    // console.log('removeDuplicateCards', scrollingToSlide);
+    if (!scrollingToSlide && !isMoving) {
+      const stackCards = getAllStackCards();
+      // remove cards with duplicate data-uuid attribute and check if slideInFromLeft or slideInFromRight animation is not applied
+      const duplicateRemoved = [];
+      stackCards.forEach((card) => {
+        const duplicateCards = stackCards.filter(c => c.getAttribute('data-uuid') === card.getAttribute('data-uuid'));
+        // console.log('removeDuplicateCards', duplicateCards.length, duplicateRemoved.includes(card.getAttribute('data-uuid')));
+        if (duplicateCards.length > 1 && !duplicateRemoved.includes(card.getAttribute('data-uuid')) && !card.style.animation) {
+          duplicateCards.forEach((c, idx) => idx > 0 && c.remove());
+          duplicateRemoved.push(card.getAttribute('data-uuid'));
+        }
+      });
+    }
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].removeDuplicateCards = removeDuplicateCards;
+
+  function toggleAutoSlide(value) {
+    stopAutoSlide = value;
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sliderID].toggleAutoSlide = toggleAutoSlide;
+
+  // =============== helper functions end =======================
+
+
+  // =============== initialization code ========================
+  // Set the initial scroll position to the first slide
+  // slider.scrollLeft = getUniqueStackCards()[1]?.offsetLeft;
+  if (activeSlideUUID) {
+    scrollToSlide(activeSlideUUID, true);
+  } else {
+    // addCloneToLeft();
+  }
+
+  // console.log('Slider initialized. Now handleSlideChange');
+  handleSlideChange(activeSlideUUID);
+  toggleArrows();
+  removeDuplicateCards();
+
+};
+
+
+function init(config = document.currentScript.dataset, activeSlideUUID) {
+  // console.log('SLIDER INIT', activeSlideUUID);
+  try {
+    if (window.parent && window.parent !== window) {
+      if (typeof window?.parent?.pageBuilder !== 'undefined') {
+        if (window?.parent?.pageBuilder) {
+          "parent.pageBuilder.widgets.sections.slider.sliderConfig".split(".").reduce((prev, next) => prev[next] = prev[next] || {}, window);
+          window.pageBuilder = window.parent.pageBuilder;
+        }
+      }
+    }
+  }
+  catch (e) {
+    console.error(e)
+  }
+
+  const sectionId = config.section_id;
+  window.pageBuilder.widgets.sections.slider.sliderConfig[sectionId] = {};
+
+  let numberOfSlides = 1;
+  const autoSlide = (config.auto_slide === true || config.auto_slide == 'true') ? true : false;
+  const showArrows = (config.show_arrows === false || config.show_arrows == 'false') ? false : true;
+  const stopAutoSlide = (config.stop_auto_slide === true || config.stop_auto_slide == 'true') ? true : false;
+
+
+  if (!window.pageBuilder.widgets?.sections?.slider) {
+    window.pageBuilder.widgets.sections.slider = { sliderConfig: {} };
+  }
+  window.pageBuilder.widgets.sections.slider.sliderConfig = {
+    ...(window.pageBuilder.widgets.sections.slider.sliderConfig ?? {}),
+    [sectionId]: {
+      reInit: ({ activeSlideUUID, updatedConfig }) => {
+        // console.log('REINIT SLIDER', activeSlideUUID, updatedConfig);
+        if (activeSlideUUID === undefined) {
+          activeSlideUUID = window.pageBuilder.widgets.sections.slider.sliderConfig[sectionId].getCurrentSlideUUID();
+        }
+        // console.log('REINIT SLIDER', activeSlideUUID);
+        window.pageBuilder.widgets.sections.slider.sliderConfig[sectionId].resetSlider();
+        init({ ...config, ...updatedConfig }, activeSlideUUID);
+        // window.pageBuilder.widgets.sections.slider.sliderConfig[sectionId].removeDuplicateCards();
+      }
+    }
+  };
+
+  if (sectionId) {
+    const viewport_1024 = config.viewport_1024;
+    numberOfSlides = viewport_1024;        // Desktop view
+
+    // handle arrows on resize
+    const carouselContainer = document.querySelector('[data-uuid="' + sectionId + '"]');
+    const resizeObserver = new ResizeObserver((entries) => {
+      window.pageBuilder.widgets.sections.slider.sliderConfig[sectionId].stopInterval && window.pageBuilder.widgets.sections.slider.sliderConfig[sectionId].stopInterval();
+      const viewportWidth = window.innerWidth;
+      const viewport_767 = config.viewport_767;
+      // smallest
+      const viewport_s = config.viewport_s;
+
+      if (viewportWidth > 1024) {
+        numberOfSlides = viewport_1024;
+      } else if (viewportWidth > 767 && viewport_767) {
+        numberOfSlides = viewport_767;        // Tablet view
+      } else {
+        numberOfSlides = viewport_s;        // Mobile view
+      }
+      Slider({
+        sliderID: sectionId,
+        numbersOfSlideOnViewport: numberOfSlides,
+        autoSlide,
+        activeSlideUUID,
+        showArrows,
+        stopAutoSlide
+      });
+    })
+
+    carouselContainer && resizeObserver.observe(carouselContainer);
+
+    Slider({
+      sliderID: sectionId,
+      numbersOfSlideOnViewport: numberOfSlides,
+      autoSlide,
+      activeSlideUUID,
+      showArrows,
+      stopAutoSlide
+    });
+  }
+}
+
+// Assign empty object for non available keys
+"pageBuilder.widgets.sections.slider.sliderConfig".split(".").reduce((prev, next) => prev[next] = prev[next] || {}, window);
+
+init();
