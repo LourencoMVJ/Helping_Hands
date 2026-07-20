@@ -45,4 +45,18 @@ document.addEventListener('DOMContentLoaded', function () {
   // Footer year
   var yearEl = document.getElementById('year');
   if (yearEl) { yearEl.textContent = new Date().getFullYear(); }
+
+  // Gallery carousel (mobile only — buttons scroll one image at a time)
+  document.querySelectorAll('.gallery-wrap').forEach(function (wrap) {
+    var track = wrap.querySelector('.gallery-grid');
+    var prev = wrap.querySelector('.gallery-nav.prev');
+    var next = wrap.querySelector('.gallery-nav.next');
+    if (!track || !prev || !next) return;
+    prev.addEventListener('click', function () {
+      track.scrollBy({ left: -track.clientWidth, behavior: 'smooth' });
+    });
+    next.addEventListener('click', function () {
+      track.scrollBy({ left: track.clientWidth, behavior: 'smooth' });
+    });
+  });
 });
